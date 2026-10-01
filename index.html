@@ -260,21 +260,25 @@ const HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
 function dayLabel(iso){ const d = new Date(iso + 'T12:00:00'); return `${HARI[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`; }
 
 /* ---------- Koneksi: fetch tanpa cookie (aman untuk browser multi-akun Google), cadangan JSONP ---------- */
-async function api(params){
+async function api(params, opt){
+  opt = opt || {};
   const q = new URLSearchParams({ ...params, pin: load(LS.pin) });
   let data;
   try {
-    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 30000);
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), opt.timeout || 30000);
     const res = await fetch(API_URL + '?' + q.toString(), { credentials: 'omit', redirect: 'follow', signal: ctrl.signal });
     clearTimeout(t); data = await res.json();
-  } catch (e) { data = await apiJsonp(params); }
+  } catch (e) {
+    if (opt.noRetry && e.name === 'AbortError') throw new Error('Proses masih berjalan di server. Tunggu ±1 menit, lalu buka ulang PO WA.');
+    data = await apiJsonp(params, opt.timeout);
+  }
   if (!data || !data.ok) throw new Error((data && data.error) || 'Gagal memproses.');
   return data;
 }
-function apiJsonp(params){
+function apiJsonp(params, ms){
   return new Promise((resolve, reject) => {
     const cb = 'cb_' + newSid(); const s = document.createElement('script');
-    const timer = setTimeout(() => { done(); reject(new Error('Koneksi lambat. Cek sinyal lalu coba lagi.')); }, 30000);
+    const timer = setTimeout(() => { done(); reject(new Error('Koneksi lambat. Cek sinyal lalu coba lagi.')); }, ms || 30000);
     function done(){ clearTimeout(timer); delete window[cb]; s.remove(); }
     window[cb] = d => { done(); resolve(d); };
     s.onerror = () => { done(); reject(new Error('Tidak bisa terhubung ke server. Coba mode incognito.')); };
@@ -503,18 +507,27 @@ async function openPo(){
     state.po = r; renderPo();
   } catch(e){ v.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+function fmtGen(g){
+  const d = new Date(g.at); if (isNaN(d)) return '';
+  const p2 = n => String(n).padStart(2, '0');
+  return `${HARI[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1} ${p2(d.getHours())}:${p2(d.getMinutes())}` + (g.by ? ` · ${g.by}` : '');
+}
 function renderPo(){
   const r = state.po, v = $('poView');
-  if (!r.blocks.length){ v.innerHTML = '<div class="empty">Belum ada PO. Minta supervisor jalankan PO Tools → Generate PO Hari Ini.</div>'; return; }
+  const genHtml = `<div class="poCard"><div class="poHead"><h3>PO hari ini</h3></div>
+    <div class="poInfo" style="margin:4px 0 0">${r.gen ? 'Terakhir dibuat: <b>' + esc(fmtGen(r.gen)) + '</b>' : 'Belum ada data pembuatan'}</div>
+    <button class="btn primary" id="poGenBtn" style="width:100%;margin-top:12px">Buat / perbarui PO hari ini</button>
+    <div class="poInfo" style="margin:8px 0 0">Tekan setelah semua area selesai opname. Aman ditekan ulang kalau ada opname susulan.</div></div>`;
+  if (!r.blocks.length){ v.innerHTML = genHtml + `<div class="empty">${r.gen ? 'Semua stok aman, tidak ada yang perlu dipesan. 👍' : 'Belum ada PO. Tekan "Buat / perbarui PO hari ini".'}</div>`; return; }
   const stale = r.blocks.some(b => !b.today);
-  v.innerHTML = (stale
-      ? `<div class="poStale">PO ini dibuat <b>${esc(r.blocks[0].date || 'bukan hari ini')}</b>, bukan hari ini. Pastikan Generate PO sudah dijalankan setelah opname hari ini sebelum dikirim.</div>`
-      : `<div class="poInfo">PO hari ini · ${r.blocks.length} supplier. Salin lalu tempel di chat supplier, atau tekan Buka WA dan pilih kontaknya.</div>`) +
+  v.innerHTML = genHtml + (stale
+      ? `<div class="poStale">PO ini dibuat <b>${esc(r.blocks[0].date || 'bukan hari ini')}</b>, bukan hari ini. Tekan <b>Buat / perbarui PO hari ini</b> sebelum dikirim.</div>`
+      : `<div class="poInfo">${r.blocks.length} supplier. Tekan Kirim ke WA, atau Salin lalu tempel di chat/grup supplier.</div>`) +
     r.blocks.map((b, i) => `<div class="poCard">
       <div class="poHead"><h3>${esc(b.sup)}</h3><small>${b.count} item</small></div>
       <div class="poBtns">
         <button class="btn ghost" data-copy="${i}">Salin teks</button>
-        <button class="btn wa" data-wa="${i}">Buka WA</button>
+        <button class="btn wa" data-wa="${i}">${b.wa ? 'Kirim ke WA' : 'Buka WA'}</button>
       </div>
       <details><summary>Lihat isi PO</summary><div class="poText">${esc(b.text)}</div></details>
     </div>`).join('');
@@ -535,7 +548,16 @@ $('poView').addEventListener('click', async e => {
     if (ok){ b.textContent = '✓ Tersalin'; b.classList.remove('ghost'); b.classList.add('done'); toast('Teks PO disalin. Tempel di chat WA supplier.'); }
     else toast('Gagal menyalin. Buka "Lihat isi PO", tekan lama teksnya, lalu salin.', true);
   } else if (b.dataset.wa !== undefined){
-    window.open('https://wa.me/?text=' + encodeURIComponent(state.po.blocks[+b.dataset.wa].text), '_blank');
+    const blk = state.po.blocks[+b.dataset.wa];
+    window.open('https://wa.me/' + (blk.wa || '') + '?text=' + encodeURIComponent(blk.text), '_blank');
+  } else if (b.id === 'poGenBtn'){
+    if (!confirm('Buat PO dari data opname terbaru? Proses bisa ±1 menit. PO lama akan diganti.')) return;
+    b.disabled = true; b.textContent = 'Membuat PO… (±1 menit)';
+    try {
+      const r = await api({ action: 'so_genpo', by: load(LS.name) || '' }, { timeout: 180000, noRetry: true });
+      state.po = r; renderPo();
+      toast(r.generated && r.generated.suppliers ? `PO dibuat: ${r.generated.suppliers} supplier.` : 'Semua stok aman, tidak ada yang perlu dipesan.');
+    } catch(err){ toast(err.message, true); b.disabled = false; b.textContent = 'Buat / perbarui PO hari ini'; }
   }
 });
 
