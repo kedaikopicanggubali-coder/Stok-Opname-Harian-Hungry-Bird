@@ -556,7 +556,10 @@ $('poView').addEventListener('click', async e => {
     try {
       const r = await api({ action: 'so_genpo', by: load(LS.name) || '' }, { timeout: 180000, noRetry: true });
       state.po = r; renderPo();
-      toast(r.generated && r.generated.suppliers ? `PO dibuat: ${r.generated.suppliers} supplier.` : 'Semua stok aman, tidak ada yang perlu dipesan.');
+      const g = r.generated || {}, skip = g.gudangSkip || [];
+      let msg = g.suppliers ? `PO dibuat: ${g.suppliers} supplier.` : 'Semua stok aman, tidak ada yang perlu dipesan.';
+      if (skip.length) msg += ` Tidak tercatat di Kartu Stok Gudang (nama tidak ada di Master Item Gudang): ${skip.join(', ')}.`;
+      toast(msg, skip.length > 0);
     } catch(err){ toast(err.message, true); b.disabled = false; b.textContent = 'Buat / perbarui PO hari ini'; }
   }
 });
