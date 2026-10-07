@@ -26,7 +26,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{font-family:var(--font);background:var(--paper);color:var(--ink);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
-button,input{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--brass);outline-offset:2px}
 .hidden{display:none!important}
@@ -161,6 +161,26 @@ header{position:sticky;top:0;z-index:5;background:var(--area);color:#fff;padding
 .poCard summary{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 0}
 .poText{white-space:pre-wrap;font-size:13.5px;background:var(--paper);border-radius:10px;padding:12px;margin-top:6px;line-height:1.45}
 
+/* ---------- v1.3: catatan PO terkirim ---------- */
+.sentOk,.sentWarn{border-radius:12px;padding:11px 13px;font-size:14.5px;margin-top:10px;line-height:1.4}
+.sentOk{background:var(--ok-soft);color:#1d5e3c}
+.sentWarn{background:var(--low-soft);color:#7a5305}
+.sentList{list-style:none;margin:6px 0 0;padding:0}
+.sentList li{padding:2px 0}
+.dupTag{font-weight:700;color:var(--warn);font-size:13px;white-space:nowrap}
+.sNote{margin-top:4px;font-style:italic}
+.linkBtn{border:0;background:none;color:inherit;text-decoration:underline;text-underline-offset:3px;font-size:14px;padding:8px 0 0}
+.markBtn{display:block;border:0;background:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:14px;padding:10px 0 0}
+.btn.manual{width:100%;background:var(--card);border:1.5px dashed #b8c0cf;color:var(--ink);margin-bottom:12px;font-size:16px}
+.otherList{list-style:none;margin:8px 0 0;padding:0;font-size:14.5px}
+.otherList li{padding:6px 0;border-top:1px solid var(--line)}
+.otherList small{display:block;color:var(--muted)}
+.field select,.field textarea{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font-size:17px;background:#fff;outline:none}
+.field select + input{margin-top:8px}
+.chipRow{display:flex;gap:8px;flex-wrap:wrap}
+.chipRow button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 14px;font-size:15px}
+.chipRow button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:700}
+
 #toast{position:fixed;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:20;max-width:600px;margin:0 auto;
   background:var(--navy);color:#fff;border-radius:14px;padding:14px 16px;font-size:15.5px;font-weight:700;text-align:center;
   box-shadow:0 12px 28px -12px rgba(30,45,72,.5)}
@@ -233,6 +253,35 @@ header{position:sticky;top:0;z-index:5;background:var(--area);color:#fff;padding
     <div class="actions">
       <button class="btn ghost" id="saveBack">Kembali</button>
       <button class="btn primary" id="saveGo">Simpan ke sheet</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim hidden" id="manScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="manTitle">
+    <h2 id="manTitle">Catat orderan di luar app</h2>
+    <div class="meta">Untuk orderan yang dikirim langsung (chat WA, telepon, toko online), supaya PO berikutnya tahu supplier ini sudah diorder.</div>
+    <div class="field">
+      <label for="manSup">Supplier</label>
+      <select id="manSup"></select>
+      <input id="manSupNew" class="hidden" autocomplete="off" placeholder="Tulis nama supplier">
+    </div>
+    <div class="field">
+      <label>Tanggal order</label>
+      <div class="chipRow" id="manDate"></div>
+    </div>
+    <div class="field">
+      <label for="manNote">Isi orderan (opsional)</label>
+      <textarea id="manNote" rows="3" placeholder="mis. Selada 2 kg, tomat 1 kg"></textarea>
+    </div>
+    <div class="field">
+      <label for="manBy">Nama kamu</label>
+      <input id="manBy" autocomplete="off" placeholder="mis. Komang">
+    </div>
+    <div class="errTxt" id="manErr" role="alert"></div>
+    <div class="actions">
+      <button class="btn ghost" id="manCancel">Batal</button>
+      <button class="btn primary" id="manSave">Simpan</button>
     </div>
   </div>
 </div>
@@ -512,25 +561,61 @@ function fmtGen(g){
   const p2 = n => String(n).padStart(2, '0');
   return `${HARI[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1} ${p2(d.getHours())}:${p2(d.getMinutes())}` + (g.by ? ` · ${g.by}` : '');
 }
+const pkey = s => String(s || '').trim().toLowerCase();
+function evWho(e){ return `${esc(e.by || 'Staf')}${e.via === 'Manual' ? ' · dicatat manual' : e.via === 'Tandai' ? ' · ditandai' : ''}`; }
+function sentHtml(b){
+  const inPo = new Set(b.items.map(x => pkey(x.n)));
+  // diorder hari-hari sebelumnya -> peringatan
+  const prev = b.prev.map(e => `<div class="sentWarn">⚠️ <b>Sudah diorder ${esc(e.tgl)}${e.jam ? ' ' + esc(e.jam) : ''}</b> · ${evWho(e)}
+      ${e.note ? `<div class="sNote">${esc(e.note)}</div>` : ''}
+      ${e.items.length ? `<ul class="sentList">${e.items.map(x => `<li>${esc(x.n)} ${esc(x.q)}${inPo.has(pkey(x.n)) ? ' <span class="dupTag">← ada juga di PO ini</span>' : ''}</li>`).join('')}</ul>` : ''}
+      <div style="margin-top:4px">Cek dulu sebelum kirim lagi.</div></div>`).join('');
+  if (!b.sent.length) return prev;
+  // sudah terkirim hari ini -> status hijau
+  const e = b.sent[0];
+  const sentKeys = new Set(b.sent.flatMap(x => x.items.map(i => pkey(i.n))));
+  const belum = b.sent.some(x => x.via !== 'Manual') ? b.items.filter(x => !sentKeys.has(pkey(x.n))) : [];
+  return prev + `<div class="sentOk">✓ <b>Terkirim hari ini${e.jam ? ' ' + esc(e.jam) : ''}</b> · ${evWho(e)}
+      ${e.note ? `<div class="sNote">${esc(e.note)}</div>` : ''}
+      ${belum.length ? `<div style="margin-top:4px;color:#7a5305"><b>PO berubah sejak dikirim.</b> Belum terkirim: ${belum.map(x => esc(x.n)).join(', ')}</div>` : ''}
+      <button class="linkBtn" data-unsend="${esc(e.id)}">Batalkan catatan ini</button></div>`;
+}
 function renderPo(){
   const r = state.po, v = $('poView');
   const genHtml = `<div class="poCard"><div class="poHead"><h3>PO hari ini</h3></div>
     <div class="poInfo" style="margin:4px 0 0">${r.gen ? 'Terakhir dibuat: <b>' + esc(fmtGen(r.gen)) + '</b>' : 'Belum ada data pembuatan'}</div>
     <button class="btn primary" id="poGenBtn" style="width:100%;margin-top:12px">Buat / perbarui PO hari ini</button>
-    <div class="poInfo" style="margin:8px 0 0">Tekan setelah semua area selesai opname. Aman ditekan ulang kalau ada opname susulan.</div></div>`;
-  if (!r.blocks.length){ v.innerHTML = genHtml + `<div class="empty">${r.gen ? 'Semua stok aman, tidak ada yang perlu dipesan. 👍' : 'Belum ada PO. Tekan "Buat / perbarui PO hari ini".'}</div>`; return; }
+    <div class="poInfo" style="margin:8px 0 0">Tekan setelah semua area selesai opname. Aman ditekan ulang kalau ada opname susulan.</div></div>
+    <button class="btn manual" id="poManBtn">+ Catat orderan di luar app</button>`;
+  const others = (r.others || []).length ? `<div class="poCard"><div class="poHead"><h3>Diorder ${r.days || 2} hari terakhir</h3><small>tidak ada di PO ini</small></div>
+    <ul class="otherList">${r.others.map(o => o.events.map(e => `<li><b>${esc(o.sup)}</b> · ${esc(e.tgl)}${e.jam ? ' ' + esc(e.jam) : ''}
+      <small>${evWho(e)}${e.note ? ' · ' + esc(e.note) : e.items.length ? ' · ' + e.items.length + ' item' : ''}</small></li>`).join('')).join('')}</ul></div>` : '';
+  if (!r.blocks.length){ v.innerHTML = genHtml + others + `<div class="empty">${r.gen ? 'Semua stok aman, tidak ada yang perlu dipesan. 👍' : 'Belum ada PO. Tekan "Buat / perbarui PO hari ini".'}</div>`; return; }
   const stale = r.blocks.some(b => !b.today);
+  const warnCount = r.blocks.filter(b => b.prev.length).length;
   v.innerHTML = genHtml + (stale
       ? `<div class="poStale">PO ini dibuat <b>${esc(r.blocks[0].date || 'bukan hari ini')}</b>, bukan hari ini. Tekan <b>Buat / perbarui PO hari ini</b> sebelum dikirim.</div>`
-      : `<div class="poInfo">${r.blocks.length} supplier. Tekan Kirim ke WA, atau Salin lalu tempel di chat/grup supplier.</div>`) +
+      : `<div class="poInfo">${r.blocks.length} supplier${warnCount ? ` · <b style="color:#7a5305">${warnCount} sudah diorder sebelumnya, cek dulu</b>` : ''}. Tekan Kirim ke WA, atau Salin lalu tempel di chat/grup supplier.</div>`) +
     r.blocks.map((b, i) => `<div class="poCard">
       <div class="poHead"><h3>${esc(b.sup)}</h3><small>${b.count} item</small></div>
+      ${sentHtml(b)}
       <div class="poBtns">
         <button class="btn ghost" data-copy="${i}">Salin teks</button>
-        <button class="btn wa" data-wa="${i}">${b.wa ? 'Kirim ke WA' : 'Buka WA'}</button>
+        <button class="btn wa" data-wa="${i}">${b.sent.length ? 'Kirim ulang' : b.wa ? 'Kirim ke WA' : 'Buka WA'}</button>
       </div>
+      ${b.sent.length ? '' : `<button class="markBtn" data-mark="${i}">Kirim lewat salin teks? Tandai terkirim</button>`}
       <details><summary>Lihat isi PO</summary><div class="poText">${esc(b.text)}</div></details>
-    </div>`).join('');
+    </div>`).join('') + others;
+}
+async function markSent(i, via){
+  const b = state.po.blocks[i];
+  let by = load(LS.name);
+  if (!by && via === 'tandai'){ by = (prompt('Nama kamu (dicatat sebagai pengirim):') || '').trim(); if (by) store(LS.name, by); }
+  try {
+    const r = await api({ action: 'so_sent', data: JSON.stringify({ sup: b.sup, by: by || 'Staf', via, items: b.items }) });
+    state.po = r; renderPo();
+    toast(`Tercatat: PO ${b.sup} terkirim.`);
+  } catch(e){ toast(`Gagal mencatat PO ${b.sup}: ${e.message} Tekan "Tandai terkirim".`, true); }
 }
 async function copyText(t){
   try { await navigator.clipboard.writeText(t); return true; }
@@ -550,6 +635,19 @@ $('poView').addEventListener('click', async e => {
   } else if (b.dataset.wa !== undefined){
     const blk = state.po.blocks[+b.dataset.wa];
     window.open('https://wa.me/' + (blk.wa || '') + '?text=' + encodeURIComponent(blk.text), '_blank');
+    markSent(+b.dataset.wa, 'wa'); // tercatat otomatis, tanpa pertanyaan
+  } else if (b.dataset.mark !== undefined){
+    b.disabled = true; b.textContent = 'Menyimpan…';
+    await markSent(+b.dataset.mark, 'tandai');
+  } else if (b.dataset.unsend !== undefined){
+    if (!confirm('Batalkan catatan "terkirim" ini? Pakai ini kalau PO-nya ternyata tidak jadi dikirim.')) return;
+    b.disabled = true; b.textContent = 'Membatalkan…';
+    try {
+      state.po = await api({ action: 'so_unsend', data: JSON.stringify({ id: b.dataset.unsend, by: load(LS.name) || 'Staf' }) });
+      renderPo(); toast('Catatan terkirim dibatalkan.');
+    } catch(err){ toast(err.message, true); b.disabled = false; b.textContent = 'Batalkan catatan ini'; }
+  } else if (b.id === 'poManBtn'){
+    openManual();
   } else if (b.id === 'poGenBtn'){
     if (!confirm('Buat PO dari data opname terbaru? Proses bisa ±1 menit. PO lama akan diganti.')) return;
     b.disabled = true; b.textContent = 'Membuat PO… (±1 menit)';
@@ -563,6 +661,46 @@ $('poView').addEventListener('click', async e => {
     } catch(err){ toast(err.message, true); b.disabled = false; b.textContent = 'Buat / perbarui PO hari ini'; }
   }
 });
+
+/* ---------- Catat orderan di luar app (v1.3) ---------- */
+function openManual(){
+  const sups = state.po.sups || [];
+  $('manSup').innerHTML = '<option value="">— pilih supplier —</option>' +
+    sups.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('') + '<option value="__new">+ Tulis nama lain…</option>';
+  $('manSupNew').value = ''; $('manSupNew').classList.add('hidden');
+  const today = state.po.today || state.today;
+  state.manDate = today;
+  const names = ['Hari ini', 'Kemarin', '2 hari lalu'];
+  $('manDate').innerHTML = [0, -1, -2].map((d, i) => { const iso = isoShift(today, d);
+    return `<button type="button" data-iso="${iso}" aria-pressed="${iso === today}">${names[i]} · ${dayLabel(iso)}</button>`; }).join('');
+  $('manNote').value = ''; $('manBy').value = load(LS.name); $('manErr').textContent = '';
+  $('manScrim').classList.remove('hidden');
+}
+$('manSup').addEventListener('change', () => {
+  const nw = $('manSup').value === '__new';
+  $('manSupNew').classList.toggle('hidden', !nw); if (nw) $('manSupNew').focus();
+});
+$('manDate').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.manDate = b.dataset.iso;
+  [...$('manDate').children].forEach(c => c.setAttribute('aria-pressed', c.dataset.iso === state.manDate));
+});
+$('manCancel').onclick = () => $('manScrim').classList.add('hidden');
+$('manScrim').addEventListener('click', e => { if (e.target.id === 'manScrim') $('manScrim').classList.add('hidden'); });
+$('manSave').onclick = async () => {
+  const sup = $('manSup').value === '__new' ? $('manSupNew').value.trim() : $('manSup').value;
+  const by = $('manBy').value.trim(), err = $('manErr');
+  if (!sup){ err.textContent = 'Pilih atau tulis nama supplier.'; return; }
+  if (!by){ err.textContent = 'Isi nama kamu dulu.'; $('manBy').focus(); return; }
+  store(LS.name, by); err.textContent = '';
+  const btn = $('manSave'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+  try {
+    state.po = await api({ action: 'so_manual', data: JSON.stringify({ sup, by, tanggal: state.manDate, note: $('manNote').value.trim() }) });
+    renderPo(); $('manScrim').classList.add('hidden');
+    toast(`Tercatat: ${sup} sudah diorder ${dayLabel(state.manDate)}.`);
+  } catch(e){ err.textContent = e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Simpan'; }
+};
 
 /* ---------- Mulai ---------- */
 window.addEventListener('beforeunload', e => { if (dirtyCount()){ e.preventDefault(); e.returnValue = ''; } });
