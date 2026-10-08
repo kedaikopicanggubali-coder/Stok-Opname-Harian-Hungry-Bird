@@ -186,6 +186,35 @@ header{position:sticky;top:0;z-index:5;background:var(--area);color:#fff;padding
   box-shadow:0 12px 28px -12px rgba(30,45,72,.5)}
 #toast.err{background:var(--warn)}
 
+/* ---------- v1.4: Master Item ---------- */
+.poEntry.mEntry{margin-top:10px}
+.poEntry.mEntry .ic{background:var(--navy)}
+#masterView{padding:8px 16px 40px}
+.mTools{display:flex;gap:8px;margin:8px 0 10px}
+.mTools input{flex:1;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.mChips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:6px}
+.mChips::-webkit-scrollbar{display:none}
+.mChips button{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:14.5px;font-weight:700;color:var(--muted)}
+.mChips button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.mGrp{font-family:var(--display);font-weight:800;font-size:17px;color:var(--navy);padding:16px 2px 8px}
+.mGrp small{font-family:var(--font);font-weight:400;font-size:13px;color:var(--muted);margin-left:6px}
+.mItem{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:12px 14px;margin-bottom:8px;color:var(--ink)}
+.mItem .nm{font-weight:700;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.mItem .s2{font-size:13px;color:var(--muted);margin-top:2px}
+.mItem .mm{margin-left:auto;text-align:right;white-space:nowrap}
+.mItem .mm b{font-family:var(--display);font-size:18px}
+.mItem .mm small{display:block;font-size:12.5px;color:var(--muted)}
+.mItem.off{opacity:.6}
+.offTag{display:inline-block;font-size:12px;font-weight:700;color:var(--muted);background:#e6e9ef;padding:1px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
+.lock{font-weight:700;color:var(--ink)}
+.field select{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font-size:17px;background:#fff;outline:none}
+.field select + input{margin-top:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mHint{font-size:13.5px;color:var(--muted);margin-top:6px}
+.mToggle{display:flex!important;align-items:center;gap:12px;font-size:16px!important;color:var(--ink)!important;cursor:pointer}
+.mToggle input{width:22px!important;height:22px;flex:none;accent-color:var(--navy);padding:0}
+
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}header,.prog i,.areaCard{transition:none}}
 </style>
 </head>
@@ -223,9 +252,16 @@ header{position:sticky;top:0;z-index:5;background:var(--area);color:#fff;padding
       <span><b>PO WA</b><small>Salin orderan supplier, kirim lewat WhatsApp</small></span>
       <span class="go">›</span>
     </button>
+    <button class="poEntry mEntry" id="btnMaster">
+      <span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+      <span><b>Master Item</b><small>Tambah item, ubah min/max, satuan & supplier</small></span>
+      <span class="go">›</span>
+    </button>
   </div>
 
   <div id="poView" class="wrap hidden"></div>
+
+  <div id="masterView" class="wrap hidden"></div>
 
   <div id="areaView" class="hidden">
     <div class="tools wrap">
@@ -286,6 +322,50 @@ header{position:sticky;top:0;z-index:5;background:var(--area);color:#fff;padding
   </div>
 </div>
 
+<!-- Master item (v1.4) -->
+<div class="scrim hidden" id="mScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h2 id="mTitle"></h2>
+    <div class="meta" id="mMeta"></div>
+    <div id="mNewFields">
+      <div class="field">
+        <label for="mName">Nama item</label>
+        <input id="mName" autocomplete="off" placeholder="mis. Struk Kertas">
+        <div class="mHint" id="mNameHint"></div>
+      </div>
+      <div class="field two">
+        <div><label for="mArea">Area</label><select id="mArea"></select>
+          <input id="mAreaNew" class="hidden" autocomplete="off" placeholder="Tulis area"></div>
+        <div><label for="mSub">Sub area (opsional)</label><select id="mSub"></select>
+          <input id="mSubNew" class="hidden" autocomplete="off" placeholder="Tulis sub area"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="mUnit">Satuan</label>
+      <select id="mUnit"></select>
+      <input id="mUnitNew" class="hidden" autocomplete="off" placeholder="Tulis satuan baru">
+    </div>
+    <div class="field two">
+      <div><label for="mMin">Min</label><input id="mMin" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <div><label for="mMax">Max</label><input id="mMax" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    </div>
+    <div class="mHint">Masuk PO kalau stok ≤ Min. Jumlah dipesan = Max − stok.</div>
+    <div class="field">
+      <label for="mSup">Supplier</label>
+      <select id="mSup"></select>
+      <input id="mSupNew" class="hidden" autocomplete="off" placeholder="Tulis nama supplier">
+    </div>
+    <div class="field">
+      <label class="mToggle"><input type="checkbox" id="mAktif"> Aktif (muncul di opname & ikut PO)</label>
+    </div>
+    <div class="errTxt" id="mErr" role="alert"></div>
+    <div class="actions">
+      <button class="btn ghost" id="mCancel">Batal</button>
+      <button class="btn primary" id="mSave" style="background:var(--navy)">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="hidden" role="status"></div>
 
 <script>
@@ -337,7 +417,7 @@ function apiJsonp(params, ms){
 }
 function toast(msg, isErr){
   const t = $('toast'); t.textContent = msg; t.className = isErr ? 'err' : '';
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), isErr ? 5000 : 3000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), Math.max(isErr ? 5000 : 3000, msg.length * 55));
 }
 
 /* ---------- Login ---------- */
@@ -389,7 +469,7 @@ function showHome(){
   document.documentElement.style.setProperty('--area', '#1e2d48');
   $('title').textContent = 'Stok Opname Harian';
   $('btnBack').classList.add('hidden'); $('progWrap').classList.add('hidden');
-  $('areaView').classList.add('hidden'); $('poView').classList.add('hidden'); $('dates').classList.remove('hidden');
+  $('areaView').classList.add('hidden'); $('poView').classList.add('hidden'); $('masterView').classList.add('hidden'); $('dates').classList.remove('hidden');
   $('home').classList.remove('hidden');
   $('homeHint').textContent = `Tanggal ${dayLabel(state.date)} · sheet "${state.data.sheet}". Pilih area yang mau diisi.`;
   $('areaCards').innerHTML = state.data.areas.map(a => {
@@ -413,7 +493,7 @@ function openArea(name){
   document.documentElement.style.setProperty('--area', AREA_COLORS[a.name] || '#374151');
   $('title').textContent = a.name;
   $('btnBack').classList.remove('hidden'); $('progWrap').classList.remove('hidden');
-  $('home').classList.add('hidden'); $('poView').classList.add('hidden'); $('dates').classList.remove('hidden');
+  $('home').classList.add('hidden'); $('poView').classList.add('hidden'); $('masterView').classList.add('hidden'); $('dates').classList.remove('hidden');
   $('areaView').classList.remove('hidden');
   $('inSearch').value = '';
   renderList(); renderProgress();
@@ -547,7 +627,7 @@ async function openPo(){
   document.documentElement.style.setProperty('--area', '#1e2d48');
   $('title').textContent = 'PO WA';
   $('btnBack').classList.remove('hidden'); $('progWrap').classList.add('hidden'); $('dates').classList.add('hidden');
-  $('home').classList.add('hidden'); $('areaView').classList.add('hidden');
+  $('home').classList.add('hidden'); $('areaView').classList.add('hidden'); $('masterView').classList.add('hidden');
   const v = $('poView'); v.classList.remove('hidden');
   v.innerHTML = '<div class="loading">Memuat PO…</div>';
   window.scrollTo(0, 0);
@@ -698,6 +778,149 @@ $('manSave').onclick = async () => {
     state.po = await api({ action: 'so_manual', data: JSON.stringify({ sup, by, tanggal: state.manDate, note: $('manNote').value.trim() }) });
     renderPo(); $('manScrim').classList.add('hidden');
     toast(`Tercatat: ${sup} sudah diorder ${dayLabel(state.manDate)}.`);
+  } catch(e){ err.textContent = e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Simpan'; }
+};
+
+/* ---------- Master Item (v1.4) ---------- */
+const MPIN_KEY = 'hbso_mpin';
+$('btnMaster').onclick = () => openMaster();
+async function mApi(params){
+  try { return await api({ ...params, mpin: load(MPIN_KEY) }); }
+  catch(e){
+    if (!/PIN master/i.test(e.message)) throw e;
+    const pin = (prompt('PIN khusus untuk edit Master Item:') || '').trim();
+    if (!pin) throw new Error('Butuh PIN master untuk membuka menu ini.');
+    store(MPIN_KEY, pin);
+    try { return await api({ ...params, mpin: pin }); }
+    catch(e2){ if (/PIN master/i.test(e2.message)) store(MPIN_KEY, null); throw e2; }
+  }
+}
+async function openMaster(){
+  state.area = null;
+  document.documentElement.style.setProperty('--area', '#1e2d48');
+  $('title').textContent = 'Master Item';
+  $('btnBack').classList.remove('hidden'); $('progWrap').classList.add('hidden'); $('dates').classList.add('hidden');
+  $('home').classList.add('hidden'); $('areaView').classList.add('hidden'); $('poView').classList.add('hidden');
+  const v = $('masterView'); v.classList.remove('hidden');
+  if (!state.master) v.innerHTML = '<div class="loading">Memuat master…</div>';
+  window.scrollTo(0, 0);
+  try { state.master = await mApi({ action: 'so_master' }); renderMaster(); }
+  catch(e){ v.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+function renderMaster(){
+  const M = state.master;
+  if (!state.mArea) state.mArea = 'Semua';
+  const q = $('mSearch') ? $('mSearch').value : '';
+  $('masterView').innerHTML = `<button class="btn primary" id="mNew" style="width:100%;margin-top:8px;background:var(--navy)">+ Item baru</button>
+    <div class="mTools"><input id="mSearch" type="search" placeholder="Cari item atau supplier…" autocomplete="off" value="${esc(q)}"></div>
+    <div class="mChips" id="mChips">${['Semua', ...M.areas].map(a => `<button data-a="${esc(a)}" aria-pressed="${a === state.mArea}">${esc(a)}</button>`).join('')}</div>
+    <div id="mList"></div>`;
+  renderMasterList();
+}
+function renderMasterList(){
+  const M = state.master, words = $('mSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = M.items.filter(it => (state.mArea === 'Semua' || it.area === state.mArea) &&
+    words.every(w => (it.n + ' ' + it.sup).toLowerCase().includes(w)));
+  if (!hits.length){ $('mList').innerHTML = '<div class="empty">Tidak ada item yang cocok.</div>'; return; }
+  const groups = [];
+  hits.forEach(it => {
+    const k = it.area + (it.sub ? ' · ' + it.sub : '');
+    let g = groups.find(x => x.k === k); if (!g){ g = { k, items: [] }; groups.push(g); }
+    g.items.push(it);
+  });
+  $('mList').innerHTML = groups.map(g => {
+    const on = g.items.filter(x => x.aktif), off = g.items.filter(x => !x.aktif);
+    return `<div class="mGrp">${esc(g.k)}<small>${on.length} item${off.length ? ` · ${off.length} nonaktif` : ''}</small></div>` +
+      on.concat(off).map(it => `<button class="mItem${it.aktif ? '' : ' off'}" data-row="${it.row}">
+        <span style="min-width:0"><span class="nm">${esc(it.n)}</span>${it.aktif ? '' : '<span class="offTag">Nonaktif</span>'}
+          <span class="s2" style="display:block">${esc(it.sup || 'Supplier belum diisi')}</span></span>
+        <span class="mm"><b>${fmt(it.min)}–${fmt(it.max)}</b><small>min–max · ${esc(it.u)}</small></span></button>`).join('');
+  }).join('');
+}
+$('masterView').addEventListener('click', e => {
+  if (e.target.id === 'mNew'){ openMItem(null); return; }
+  const c = e.target.closest('#mChips button');
+  if (c){ state.mArea = c.dataset.a; [...$('mChips').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.a === state.mArea)); renderMasterList(); return; }
+  const b = e.target.closest('.mItem'); if (b) openMItem(+b.dataset.row);
+});
+$('masterView').addEventListener('input', e => { if (e.target.id === 'mSearch') renderMasterList(); });
+
+function fillSel(selId, newId, opts, free, cur, emptyLabel){
+  const list = opts.slice();
+  if (cur && !list.some(o => o.toLowerCase() === cur.toLowerCase())) list.unshift(cur);
+  $(selId).innerHTML = `<option value="">${emptyLabel || '— pilih —'}</option>` +
+    list.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('') +
+    (free ? '<option value="__new">+ Tulis baru…</option>' : '');
+  $(selId).value = list.find(o => o.toLowerCase() === (cur || '').toLowerCase()) || '';
+  $(newId).value = ''; $(newId).classList.add('hidden');
+}
+function selVal(selId, newId){ const v = $(selId).value; return v === '__new' ? $(newId).value.trim() : v; }
+[['mArea','mAreaNew'], ['mSub','mSubNew'], ['mUnit','mUnitNew'], ['mSup','mSupNew']].forEach(([s, n]) => $(s).addEventListener('change', () => {
+  const nw = $(s).value === '__new'; $(n).classList.toggle('hidden', !nw); if (nw) $(n).focus();
+  if (s === 'mArea') fillSub();
+}));
+function fillSub(){
+  const a = selVal('mArea', 'mAreaNew'), M = state.master;
+  fillSel('mSub', 'mSubNew', (M.subs[a] || []), true, '', '— tanpa sub area —');
+}
+function openMItem(row){
+  const M = state.master, it = row ? M.items.find(x => x.row === row) : null;
+  state.mEdit = it;
+  $('mTitle').textContent = it ? it.n : 'Item baru';
+  $('mNewFields').classList.toggle('hidden', !!it);
+  $('mMeta').innerHTML = it
+    ? `${esc(it.area)}${it.sub ? ' · ' + esc(it.sub) : ''} · <span class="lock">nama & area dikunci</span> supaya data opname tidak putus`
+    : 'Item langsung masuk ke sheet stok bulan ini dan bisa diisi hari ini. Nama & area tidak bisa diubah setelah disimpan.';
+  $('mName').value = ''; $('mNameHint').textContent = '';
+  if (!it){
+    const def = state.mArea && state.mArea !== 'Semua' ? state.mArea : '';
+    fillSel('mArea', 'mAreaNew', M.areas, M.areaFree, def); fillSub();
+  }
+  fillSel('mUnit', 'mUnitNew', M.units, M.unitFree, it ? it.u : '');
+  fillSel('mSup', 'mSupNew', M.sups, M.supFree, it ? it.sup : '');
+  $('mMin').value = it && it.min !== null ? fmt(it.min) : '';
+  $('mMax').value = it && it.max !== null ? fmt(it.max) : '';
+  $('mAktif').checked = it ? it.aktif : true;
+  $('mErr').textContent = '';
+  $('mScrim').classList.remove('hidden');
+  if (!it) setTimeout(() => $('mName').focus(), 60);
+}
+$('mName').addEventListener('input', () => {
+  const k = $('mName').value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const d = k && state.master.items.find(x => x.n.toLowerCase() === k);
+  $('mNameHint').textContent = d ? `Sudah ada: ${d.n} (${d.area})${d.aktif ? '' : ', nonaktif, aktifkan lagi lewat daftar'}` : '';
+});
+$('mCancel').onclick = () => $('mScrim').classList.add('hidden');
+$('mScrim').addEventListener('click', e => { if (e.target.id === 'mScrim') $('mScrim').classList.add('hidden'); });
+$('mSave').onclick = async () => {
+  const it = state.mEdit, err = $('mErr');
+  const d = { mode: it ? 'edit' : 'new', row: it ? it.row : 0,
+    n: it ? it.n : $('mName').value.trim().replace(/\s+/g, ' '),
+    area: it ? it.area : selVal('mArea', 'mAreaNew'), sub: it ? it.sub : selVal('mSub', 'mSubNew'),
+    u: selVal('mUnit', 'mUnitNew'), sup: selVal('mSup', 'mSupNew'),
+    min: $('mMin').value.trim(), max: $('mMax').value.trim(), aktif: $('mAktif').checked };
+  const mn = num(d.min), mx = num(d.max);
+  if (!d.n){ err.textContent = 'Isi nama item.'; return; }
+  if (!it && $('mNameHint').textContent){ err.textContent = 'Nama itu sudah ada di Master Item.'; return; }
+  if (!d.area){ err.textContent = 'Pilih area.'; return; }
+  if (!d.u){ err.textContent = 'Pilih satuan.'; return; }
+  if (isNaN(mn) || mn < 0){ err.textContent = 'Min harus angka 0 atau lebih.'; return; }
+  if (isNaN(mx) || mx < 0){ err.textContent = 'Max harus angka 0 atau lebih.'; return; }
+  if (mx < mn){ err.textContent = 'Max tidak boleh lebih kecil dari Min.'; return; }
+  if (d.aktif && !d.sup && !confirm('Supplier kosong: item ini tidak akan masuk PO. Tetap simpan?')) return;
+  if (it && it.aktif && !d.aktif && !confirm(`Nonaktifkan ${it.n}? Item hilang dari daftar opname dan tidak ikut PO. Angka yang sudah tercatat di sheet tetap ada.`)) return;
+  if (!it && !confirm(`Simpan "${d.n}" di ${d.area}${d.sub ? ' · ' + d.sub : ''}? Nama & area tidak bisa diubah lagi lewat aplikasi.`)) return;
+  let by = load(LS.name);
+  if (!by){ by = (prompt('Nama kamu (dicatat di log perubahan):') || '').trim(); if (by) store(LS.name, by); }
+  if (!by){ err.textContent = 'Isi nama kamu dulu supaya tercatat siapa yang mengubah.'; return; }
+  d.by = by; d.min = mn; d.max = mx; err.textContent = '';
+  const btn = $('mSave'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+  try {
+    const r = await mApi({ action: 'so_msave', data: JSON.stringify(d) });
+    state.master = r; renderMaster(); $('mScrim').classList.add('hidden');
+    toast(r.msg || 'Tersimpan.');
+    loadDate(state.date).catch(() => {}); // daftar opname ikut terbaru
   } catch(e){ err.textContent = e.message; }
   finally { btn.disabled = false; btn.textContent = 'Simpan'; }
 };
